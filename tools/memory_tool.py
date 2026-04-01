@@ -23,11 +23,16 @@ Design:
 - Frozen snapshot pattern: system prompt is stable, tool responses show live state
 """
 
-import fcntl
 import json
 import logging
 import os
 import re
+# fcntl is Unix-only; on Windows we fall back to a threading.Lock-based stub
+try:
+    import fcntl as _fcntl  # noqa: F401
+    _HAS_FCNTL = True
+except ImportError:
+    _HAS_FCNTL = False
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -130,16 +135,36 @@ class MemoryStore:
 
         Uses a separate .lock file so the memory file itself can still be
         atomically replaced via os.replace().
+
+        On Unix, uses ``fcntl.flock`` for true inter-process locking.
+        On Windows (where ``fcntl`` is unavailable), falls back to a
+        ``threading.Lock``-based in-process lock, which is sufficient for
+        the single-process use case and avoids an ``ImportError`` at startup.
         """
         lock_path = path.with_suffix(path.suffix + ".lock")
         lock_path.parent.mkdir(parents=True, exist_ok=True)
-        fd = open(lock_path, "w")
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            yield
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            fd.close()
+
+        if _HAS_FCNTL:
+            import fcntl
+            fd = open(lock_path, "w")
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                yield
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+                fd.close()
+        else:
+            # Windows fallback: in-process threading lock keyed by path
+            import threading
+            _lock_registry_lock = threading.Lock()
+            if not hasattr(MemoryTool, "_win_locks"):
+                MemoryTool._win_locks: dict = {}
+            with _lock_registry_lock:
+                if str(lock_path) not in MemoryTool._win_locks:
+                    MemoryTool._win_locks[str(lock_path)] = threading.Lock()
+                tlock = MemoryTool._win_locks[str(lock_path)]
+            with tlock:
+                yield
 
     @staticmethod
     def _path_for(target: str) -> Path:
