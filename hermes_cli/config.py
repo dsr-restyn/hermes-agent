@@ -220,6 +220,11 @@ DEFAULT_CONFIG = {
         # (terminal and execute_code).  Skill-declared required_environment_variables
         # are passed through automatically; this list is for non-skill use cases.
         "env_passthrough": [],
+        # Env var names containing proxy-brokered placeholders (not real secrets)
+        # that should bypass the provider-secret blocklist. For runtimes like
+        # NVIDIA OpenShell where a network proxy rewrites placeholder values
+        # with real credentials on egress (e.g. SLACK_BOT_TOKEN, SLACK_APP_TOKEN).
+        "proxy_credentials": [],
         "docker_image": "nikolaik/python-nodejs:python3.11-nodejs20",
         "docker_forward_env": [],
         "singularity_image": "docker://nikolaik/python-nodejs:python3.11-nodejs20",
