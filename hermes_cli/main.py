@@ -661,6 +661,12 @@ def cmd_gateway(args):
     gateway_command(args)
 
 
+def cmd_cred_proxy(args):
+    """Credential proxy management commands."""
+    from cred_proxy.cli import dispatch
+    dispatch(args)
+
+
 def cmd_whatsapp(args):
     """Set up WhatsApp: choose mode, configure, install bridge, pair via QR."""
     _require_tty("whatsapp")
@@ -4238,7 +4244,28 @@ For more help on a command:
     gateway_setup = gateway_subparsers.add_parser("setup", help="Configure messaging platforms")
 
     gateway_parser.set_defaults(func=cmd_gateway)
-    
+
+    # =========================================================================
+    # cred-proxy command
+    # =========================================================================
+    cred_proxy_parser = subparsers.add_parser(
+        "cred-proxy",
+        help="Credential proxy management (store secrets, inject into tool subprocesses)",
+        description="Manage the Hermes credential proxy daemon and secret store",
+    )
+    cred_proxy_subparsers = cred_proxy_parser.add_subparsers(
+        dest="cred_proxy_command", help="Sub-command"
+    )
+    cred_proxy_subparsers.add_parser("start", help="Start the credential proxy daemon")
+    cred_proxy_subparsers.add_parser("stop", help="Stop the credential proxy daemon")
+    cred_proxy_subparsers.add_parser("status", help="Show credential proxy status")
+    cp_add = cred_proxy_subparsers.add_parser(
+        "add", help="Add or update a named credential (prompts for value)"
+    )
+    cp_add.add_argument("name", help="Credential name used in hermes-proxy://<name>")
+    cred_proxy_subparsers.add_parser("list", help="List stored credential names")
+    cred_proxy_parser.set_defaults(func=cmd_cred_proxy)
+
     # =========================================================================
     # setup command
     # =========================================================================

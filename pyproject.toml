@@ -64,6 +64,7 @@ sms = ["aiohttp>=3.9.0,<4"]
 acp = ["agent-client-protocol>=0.8.1,<0.9"]
 dingtalk = ["dingtalk-stream>=0.1.0,<1"]
 feishu = ["lark-oapi>=1.5.3,<2"]
+cred-proxy = ["cryptography>=42.0.0,<44", "aiohttp>=3.9.0,<4"]
 rl = [
   "atroposlib @ git+https://github.com/NousResearch/atropos.git",
   "tinker @ git+https://github.com/thinking-machines-lab/tinker.git",
@@ -100,12 +101,13 @@ all = [
 hermes = "hermes_cli.main:main"
 hermes-agent = "run_agent:main"
 hermes-acp = "acp_adapter.entry:main"
+hermes-cred-proxy = "cred_proxy.cli:main"
 
 [tool.setuptools]
 py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajectory_compressor", "toolset_distributions", "cli", "hermes_constants", "hermes_state", "hermes_time", "rl_cli", "utils"]
 
 [tool.setuptools.packages.find]
-include = ["agent", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "cron", "acp_adapter", "plugins", "plugins.*"]
+include = ["agent", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "cron", "acp_adapter", "plugins", "plugins.*", "cred_proxy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

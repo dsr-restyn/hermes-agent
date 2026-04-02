@@ -287,6 +287,49 @@ def _make_run_env(env: dict) -> dict:
     existing_path = run_env.get("PATH", "")
     if "/usr/bin" not in existing_path.split(":"):
         run_env["PATH"] = f"{existing_path}:{_SANE_PATH}" if existing_path else _SANE_PATH
+
+    # Inject credential proxy env vars if proxy is running
+    try:
+        from cred_proxy.daemon import (
+            is_running as _cred_proxy_running,
+            _read_port as _cred_proxy_read_port,
+        )
+        from pathlib import Path as _Path
+        if _cred_proxy_running():
+            _state = _Path.home() / ".hermes" / "state"
+            _tcp_port = _cred_proxy_read_port()
+            if _tcp_port is not None:
+                run_env["http_proxy"] = f"http://127.0.0.1:{_tcp_port}"
+                run_env["https_proxy"] = f"http://127.0.0.1:{_tcp_port}"
+            # Build combined CA bundle: system bundle + proxy CA
+            _proxy_ca = _state / "cred-proxy-ca" / "ca.crt"
+            if _proxy_ca.exists():
+                _combined_ca = _state / "cred-proxy-ca" / "combined-ca.crt"
+                try:
+                    import certifi as _certifi
+                    _sys_bundle = _Path(_certifi.where()).read_bytes()
+                except Exception:
+                    _sys_bundle = b""
+                    for _sys_path in [
+                        "/etc/ssl/certs/ca-certificates.crt",
+                        "/etc/ssl/cert.pem",
+                    ]:
+                        try:
+                            _sys_bundle = _Path(_sys_path).read_bytes()
+                            break
+                        except Exception:
+                            pass
+                _proxy_cert = _proxy_ca.read_bytes()
+                _combined = _sys_bundle + b"\n" + _proxy_cert
+                if not _combined_ca.exists() or _combined_ca.read_bytes() != _combined:
+                    _combined_ca.parent.mkdir(parents=True, exist_ok=True)
+                    _combined_ca.write_bytes(_combined)
+                run_env["SSL_CERT_FILE"] = str(_combined_ca)
+                run_env["REQUESTS_CA_BUNDLE"] = str(_combined_ca)
+                run_env["NODE_EXTRA_CA_CERTS"] = str(_combined_ca)
+    except ImportError:
+        pass
+
     return run_env
 
 
