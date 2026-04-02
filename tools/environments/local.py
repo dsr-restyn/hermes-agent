@@ -130,6 +130,29 @@ def _build_provider_env_blocklist() -> frozenset:
 
 _HERMES_PROVIDER_ENV_BLOCKLIST = _build_provider_env_blocklist()
 
+# Guard so proxy_credentials registration runs only once, not on every subprocess call.
+_proxy_credentials_registered = False
+
+
+def _ensure_proxy_credentials_registered() -> None:
+    """Register proxy_credentials from config into env_passthrough (once).
+
+    Called from both _sanitize_subprocess_env and _make_run_env so that
+    whichever path runs first triggers registration.
+    """
+    global _proxy_credentials_registered
+    if _proxy_credentials_registered:
+        return
+    try:
+        from cli import CLI_CONFIG
+        proxy_creds = CLI_CONFIG.get("terminal", {}).get("proxy_credentials", [])
+        if proxy_creds:
+            from tools.env_passthrough import register_env_passthrough
+            register_env_passthrough(proxy_creds)
+    except ImportError:
+        pass
+    _proxy_credentials_registered = True
+
 
 def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = None) -> dict:
     """Filter Hermes-managed secrets from a subprocess environment.
@@ -139,6 +162,8 @@ def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = Non
     :mod:`tools.env_passthrough` (skill-declared or user-configured) also
     bypass the blocklist.
     """
+    _ensure_proxy_credentials_registered()
+
     try:
         from tools.env_passthrough import is_env_passthrough as _is_passthrough
     except Exception:
@@ -271,6 +296,7 @@ _SANE_PATH = (
 
 def _make_run_env(env: dict) -> dict:
     """Build a run environment with a sane PATH and provider-var stripping."""
+    _ensure_proxy_credentials_registered()
     try:
         from tools.env_passthrough import is_env_passthrough as _is_passthrough
     except Exception:
