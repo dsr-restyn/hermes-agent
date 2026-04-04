@@ -220,6 +220,11 @@ DEFAULT_CONFIG = {
         # (terminal and execute_code).  Skill-declared required_environment_variables
         # are passed through automatically; this list is for non-skill use cases.
         "env_passthrough": [],
+        # Env var names whose values are hermes-proxy:// placeholders (not real secrets).
+        # These bypass the provider-secret blocklist so the cred-proxy daemon can
+        # intercept and substitute the real credential at the transport layer.
+        # Example: ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"]
+        "proxy_credentials": [],
         "docker_image": "nikolaik/python-nodejs:python3.11-nodejs20",
         "docker_forward_env": [],
         "singularity_image": "docker://nikolaik/python-nodejs:python3.11-nodejs20",
