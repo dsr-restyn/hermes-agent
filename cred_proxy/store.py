@@ -1,35 +1,28 @@
-"""Credential store backed by the system keyring.
+"""Credential store — in-memory for Phase 1.
 
-All secrets are stored under service 'hermes-cred-proxy'.
-A JSON index of names is maintained at service 'hermes-cred-proxy-index',
-key 'names', so that list() can enumerate them without reading every value.
+All secrets live in a plain dict in the proxy process's heap.  They do not
+persist across proxy restarts — users must re-add credentials after each
+``hermes cred-proxy start``.
+
+Phase 3 will add AES-256-GCM encrypted persistence (unlocked by a master
+passphrase at daemon start, never stored on disk).
+
+No external dependencies — stdlib only.
 
 Public API: set(), list(), delete()
 Internal:   _get()  — used only by the substitutor, never exposed to callers.
 """
 
-import json
-
-import keyring
-import keyring.errors
-
-_SERVICE = "hermes-cred-proxy"
-_INDEX_SERVICE = "hermes-cred-proxy-index"
-_INDEX_KEY = "names"
-
 
 class CredStore:
-    def _read_index(self) -> list[str]:
-        raw = keyring.get_password(_INDEX_SERVICE, _INDEX_KEY)
-        if raw is None:
-            return []
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return []
+    """In-memory credential store.
 
-    def _write_index(self, names: list[str]) -> None:
-        keyring.set_password(_INDEX_SERVICE, _INDEX_KEY, json.dumps(names))
+    Thread-safety note: the proxy runs as a single-threaded asyncio event loop,
+    so no locking is required.
+    """
+
+    def __init__(self) -> None:
+        self._store: dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -37,30 +30,20 @@ class CredStore:
 
     def set(self, name: str, value: str) -> None:
         """Store a credential under *name*."""
-        keyring.set_password(_SERVICE, name, value)
-        names = self._read_index()
-        if name not in names:
-            names.append(name)
-            self._write_index(names)
+        self._store[name] = value
 
     def list(self) -> list[str]:
         """Return sorted list of stored credential names (no values)."""
-        return sorted(self._read_index())
+        return sorted(self._store.keys())
 
     def delete(self, name: str) -> None:
         """Remove credential *name* from the store.
 
         Raises KeyError if the name does not exist.
         """
-        names = self._read_index()
-        if name not in names:
+        if name not in self._store:
             raise KeyError(f"Credential {name!r} not found")
-        try:
-            keyring.delete_password(_SERVICE, name)
-        except Exception:
-            pass  # Already gone from keyring; index is source of truth for existence
-        names.remove(name)
-        self._write_index(names)
+        del self._store[name]
 
     # ------------------------------------------------------------------
     # Internal-only access (used by substitutor — NOT part of public API)
@@ -72,7 +55,6 @@ class CredStore:
         Intentionally private: agent processes must not be able to call
         this through any public interface.  Raises KeyError if not found.
         """
-        value = keyring.get_password(_SERVICE, name)
-        if value is None:
+        if name not in self._store:
             raise KeyError(f"Credential {name!r} not found")
-        return value
+        return self._store[name]

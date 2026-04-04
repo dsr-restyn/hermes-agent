@@ -171,10 +171,10 @@ def start() -> None:
 # ---------------------------------------------------------------------------
 
 def _run_server() -> None:
-    """Configure logging and run the mitmproxy server (blocks forever).
+    """Configure logging and run the asyncio HTTP proxy (blocks forever).
 
-    Pre-selects a free TCP port, then starts mitmproxy via DumpMaster.
-    Writes the PID and port files inside the mitmproxy 'running' hook so
+    Pre-selects a free TCP port, then starts the proxy via run_proxy().
+    Writes the PID and port files inside the on_started callback so
     callers polling is_running() only see the daemon as ready once it is
     fully bound and listening.
     """
