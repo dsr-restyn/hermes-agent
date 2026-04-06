@@ -582,6 +582,7 @@ def _find_all_skills(*, skip_disabled: bool = False) -> List[Dict[str, Any]]:
                     "name": name,
                     "description": description,
                     "category": category,
+                    "dir_name": skill_dir.name,
                 })
 
             except (UnicodeDecodeError, PermissionError) as e:

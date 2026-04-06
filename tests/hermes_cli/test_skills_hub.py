@@ -152,6 +152,39 @@ def test_do_list_filter_builtin(three_source_env):
     assert "local-skill" not in output
 
 
+def test_do_list_builtin_by_dir_name_when_frontmatter_differs(monkeypatch, hub_env):
+    """Bundled skills whose frontmatter name differs from their directory name must
+    still be classified as builtin.  Regression for issue #5433: _find_all_skills()
+    returns the frontmatter name ('serving-llms-vllm') while the manifest stores the
+    directory name ('vllm').  The check in do_list() must fall back to dir_name."""
+    import tools.skills_hub as hub
+    import tools.skills_sync as skills_sync
+    import tools.skills_tool as skills_tool
+
+    # Simulate a skill whose frontmatter name differs from the directory name.
+    mismatched_skills = [
+        {"name": "serving-llms-vllm", "category": "mlops", "description": "vllm", "dir_name": "vllm"},
+        {"name": "local-only", "category": "x", "description": "local", "dir_name": "local-only"},
+    ]
+    # Manifest uses directory name as key (as written by skills_sync).
+    manifest = {"vllm": "abc123"}
+
+    monkeypatch.setattr(hub, "HubLockFile", lambda: _DummyLockFile([]))
+    monkeypatch.setattr(skills_tool, "_find_all_skills", lambda: list(mismatched_skills))
+    monkeypatch.setattr(skills_sync, "_read_manifest", lambda: dict(manifest))
+
+    output = _capture()
+    assert "serving-llms-vllm" in output
+    assert "builtin" in output
+    assert "local-only" in output
+    # serving-llms-vllm must not be classified as local
+    lines = [l for l in output.splitlines() if "serving-llms-vllm" in l]
+    assert lines, "Expected serving-llms-vllm row in output"
+    assert "local" not in lines[0], (
+        f"serving-llms-vllm misclassified as local: {lines[0]!r}"
+    )
+
+
 def test_do_check_reports_available_updates(monkeypatch):
     output = _capture_check(monkeypatch, [
         {"name": "hub-skill", "source": "skills.sh", "status": "update_available"},
