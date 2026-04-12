@@ -1997,6 +1997,12 @@ class GatewayRunner:
                     return await self._handle_approve_command(event)
                 return await self._handle_deny_command(event)
 
+            # /btw must also bypass the running-agent interrupt path.
+            # It's designed to run concurrently as an ephemeral side question —
+            # sending it as an interrupt to the running agent defeats the purpose.
+            if _cmd_def_inner and _cmd_def_inner.name == "btw":
+                return await self._handle_btw_command(event)
+
             if event.message_type == MessageType.PHOTO:
                 logger.debug("PRIORITY photo follow-up for session %s — queueing without interrupt", _quick_key[:20])
                 adapter = self.adapters.get(source.platform)
