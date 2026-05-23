@@ -5,6 +5,7 @@ Diagnoses issues with Hermes Agent setup.
 """
 
 import os
+import pwd
 import sys
 import subprocess
 import shutil
@@ -859,7 +860,8 @@ def run_doctor(args):
             _cmd_link_dir = Path(_prefix) / "bin"
             _cmd_link_display = "$PREFIX/bin"
         else:
-            _cmd_link_dir = Path.home() / ".local" / "bin"
+            _real_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+            _cmd_link_dir = _real_home / ".local" / "bin"
             _cmd_link_display = "~/.local/bin"
         _cmd_link = _cmd_link_dir / "hermes"
 
